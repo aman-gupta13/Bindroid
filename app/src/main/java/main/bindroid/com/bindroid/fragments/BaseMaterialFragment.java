@@ -1,16 +1,23 @@
 package main.bindroid.com.bindroid.fragments;
 
 import android.os.Bundle;
+import android.support.annotation.Nullable;
 import android.support.v4.app.DialogFragment;
 import android.support.v7.internal.view.SupportMenuInflater;
 import android.support.v7.widget.Toolbar;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ProgressBar;
+
+import com.android.volley.toolbox.ImageLoader;
 
 import java.util.HashMap;
 import java.util.Map;
 
-import main.bindroid.com.bindroid.helper.NetworkManager;
+import main.bindroid.com.bindroid.networking.ImageRequestManager;
+import main.bindroid.com.bindroid.networking.NetworkConstants;
+import main.bindroid.com.bindroid.networking.NetworkManager;
 
 /**
  * Created by amanbindlish on 01/08/15.
@@ -29,6 +36,17 @@ public abstract class BaseMaterialFragment extends DialogFragment {
 	 * selecting menuitem.
 	 * **/
 	private SupportMenuInflater menuInflater;
+	/**
+	 * Image request manager, it will avaibale in every child class and
+	 * adapters, So dev no need create a another one.
+	 * */
+	private ImageRequestManager imageRequestManager;
+	/*
+	 *
+	 * Fragment view holder created after {@code onViewCreated} It will be null
+	 * in onDestroyView
+	 */
+	private BaseFragmentViewHolder fragmentViewHolder;
 
 	/**
 	 * Fragment Life method start. **
@@ -37,12 +55,127 @@ public abstract class BaseMaterialFragment extends DialogFragment {
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setHasOptionsMenu(true);
-		networkManager = NetworkManager.newInstance(getActivity());
+		networkManager = NetworkManager.newInstance(getActivity(),
+				NetworkConstants.BASE_URL);
 		imageRequestManager = ImageRequestManager.getInstance(getActivity());
 		menuInflater = new SupportMenuInflater(getActivity());
 	}
 
-	protected abstract int getfragmentLayout();
+	@Override
+	final public View onCreateView(LayoutInflater inflater,
+			@Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+
+		return inflater.inflate(getFragmentLayout(), container, false);
+	}
+
+	/**
+	 * return layout id that you want show in this fragment
+	 * */
+	public abstract int getFragmentLayout();
+
+	@Override
+	final public void onViewCreated(View view,
+			@Nullable Bundle savedInstanceState) {
+		super.onViewCreated(view, savedInstanceState);
+
+		// create fragment view holder.
+		this.fragmentViewHolder = createFragmentViewHolder(view);
+		onFragmentViewHolderCreated(this.fragmentViewHolder, savedInstanceState);
+		// invalidateOptionMenu();
+		// initializeToolBar();
+		// if (savedInstanceState != null) {
+		// onPostAnimationCleanup(null);
+		// }
+	}
+
+	/***
+	 * override this and return true if child is handling backpress (Toolbar and
+	 * device back button)
+	 * **/
+	public boolean onPopBackStack() {
+		return false;
+	}
+
+	/**
+	 * override this for creating {@code BaseFragmentViewHolder} otherwise
+	 * BaseFragmentViewHolder object will be created by default.
+	 */
+	public BaseFragmentViewHolder createFragmentViewHolder(View view) {
+		return new BaseFragmentViewHolder(view);
+	}
+
+	public void onFragmentViewHolderCreated(BaseFragmentViewHolder viewHolder,
+			@Nullable Bundle savedInstanceState) {
+	}
+
+	/**
+	 * child class implement this and restore view state from savedInstance
+	 * ***/
+	protected abstract void onRestoreInstanceState(
+			BaseFragmentViewHolder viewHolder, Bundle savedInstance);
+
+	/***
+	 * Implement this for saving current state of screen.
+	 * **/
+	public abstract void onSaveInstanceState(
+			BaseFragmentViewHolder fragmentViewHolder, Bundle outState);
+
+	@Override
+	final public void onSaveInstanceState(Bundle outState) {
+		saveInstanceState(outState);
+		super.onSaveInstanceState(outState);
+	}
+
+	private void saveInstanceState(Bundle outState) {
+		if (outState != null) {
+			onSaveInstanceState(this.fragmentViewHolder, outState);
+			saveHeaderValues(outState);
+		}
+	}
+
+	/**
+	 * Save all current header state into bundle. Title,logo,navigation
+	 * icon,overflow menu status,chilFragment
+	 */
+	private void saveHeaderValues(Bundle outState) {
+		// outState.putBoolean(SHOW_HAMBURGER_MENU, showHamburgerMenu);
+		// outState.putString(TITLE, this.title);
+		// outState.putBoolean(SHOW_LOGO, this.showLogo);
+		// outState.putInt(NAVIGATION_ICON_REG_ID, this.navIconRegId);
+		// outState.putIntArray(OVER_FLOW_HIDE_MENU_IDS, this.hideMenuItemIds);
+		// outState.putBoolean(IS_CHILD_FRAGMENT, isChildFragment());
+	}
+
+	/**
+	 * restore current header state from bundle. Title,logo,navigation
+	 * icon,overflow menu status,chilFragment
+	 */
+	private void restoreHeaderValues(Bundle savedInstanceState) {
+
+		// this.showHamburgerMenu = savedInstanceState.getBoolean(
+		// SHOW_HAMBURGER_MENU, this.showHamburgerMenu);
+		// this.title = savedInstanceState.getString(TITLE, title);
+		// this.navIconRegId = savedInstanceState.getInt(NAVIGATION_ICON_REG_ID,
+		// navIconRegId);
+		// this.showLogo = savedInstanceState.getBoolean(SHOW_LOGO,
+		// this.showLogo);
+		//
+		// if (savedInstanceState.containsKey(OVER_FLOW_HIDE_MENU_IDS)) {
+		// this.hideMenuItemIds = savedInstanceState
+		// .getIntArray(OVER_FLOW_HIDE_MENU_IDS);
+		// }
+		//
+		// childFragment = savedInstanceState.getBoolean(IS_CHILD_FRAGMENT,
+		// childFragment);
+	}
+
+	public NetworkManager getNetworkManager() {
+		return networkManager;
+	}
+
+	public ImageLoader getImageLoader() {
+		return imageRequestManager.getImageLoader();
+	}
 
 	public static class BaseFragmentViewHolder {
 
@@ -107,4 +240,20 @@ public abstract class BaseMaterialFragment extends DialogFragment {
 			return view;
 		}
 	}
+
+	/***
+	 * Override this for cleanup,we have already handled views cleanup and
+	 * network call cancel.
+	 * */
+	public void onDestroyFragmentViewHolder(BaseFragmentViewHolder fragmentVH) {
+	}
+
+	@Override
+	final public void onDestroyView() {
+		networkManager.cancel();
+		onDestroyFragmentViewHolder(this.fragmentViewHolder);
+		this.fragmentViewHolder = null;
+		super.onDestroyView();
+	}
+
 }
