@@ -14,7 +14,10 @@ public class BindroidApplication extends Application {
 	@Override
 	public void onCreate() {
 		super.onCreate();
+		// Initialize the SDK before executing any other operations,
+		// especially, if you're using Facebook UI elements.
 		FacebookSdk.sdkInitialize(getApplicationContext());
+		// To get the hashkey for registering our app on Facebook
 		BindroidUtils.getFbKeyHash(getApplicationContext());
 	}
 
